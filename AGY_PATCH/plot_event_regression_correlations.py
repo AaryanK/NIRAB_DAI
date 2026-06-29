@@ -20,7 +20,7 @@ reg_x = joblib.load("event_regressor_x.joblib")
 reg_y = joblib.load("event_regressor_y.joblib")
 reg_z = joblib.load("event_regressor_z.joblib")
 
-# Load data and reconstruct features (same as training)
+# Load data and reconstruct features (using phi = 3 deg)
 file_path = Path("../Cut2.root")
 if not file_path.exists():
     file_path = Path("Cut2.root")
@@ -39,9 +39,10 @@ lc_arr = t_lc.arrays([
 ], entry_stop=n_events)
 tr_arr = t_tr.arrays(["NeutrinoX4"], entry_stop=n_events)
 
-theta = 3.0 * np.pi / 180.0
-cos_half = np.cos(theta / 2.0)
-sin_half = np.sin(theta / 2.0)
+# New stereo tilt angle: phi = 3 degrees
+phi = 3.0 * np.pi / 180.0
+cos_phi = np.cos(phi)
+sin_phi = np.sin(phi)
 
 def get_line_start_end(event_id, view, idx):
     if view == "U":
@@ -53,10 +54,10 @@ def get_line_start_end(event_id, view, idx):
     return min(z1, z2), max(z1, z2)
 
 def fit_3d_line_from_2d(s_u, int_u, s_v, int_v):
-    slope_x = (s_u + s_v) / (2.0 * cos_half)
-    int_x = (int_u + int_v) / (2.0 * cos_half)
-    slope_y = (s_u - s_v) / (2.0 * sin_half)
-    int_y = (int_u - int_v) / (2.0 * sin_half)
+    slope_x = (s_u + s_v) / (2.0 * cos_phi)
+    int_x = (int_u + int_v) / (2.0 * cos_phi)
+    slope_y = (s_u - s_v) / (2.0 * sin_phi)
+    int_y = (int_u - int_v) / (2.0 * sin_phi)
     p0 = np.array([int_x, int_y, 0.0])
     d = np.array([slope_x, slope_y, 1.0])
     d = d / np.linalg.norm(d)
@@ -116,8 +117,10 @@ for event_id in range(n_events):
                 v_used.add(j)
                 p0, d = fit_3d_line_from_2d(slopes_u[i], intercepts_u[i], slopes_v[j], intercepts_v[j])
                 z_start = (z_starts_u[i] + z_starts_v[j]) / 2.0
-                x_start = ((slopes_u[i] + slopes_v[j]) / (2.0 * cos_half)) * z_start + ((intercepts_u[i] + intercepts_v[j]) / (2.0 * cos_half))
-                y_start = ((slopes_u[i] - slopes_v[j]) / (2.0 * sin_half)) * z_start + ((intercepts_u[i] - intercepts_v[j]) / (2.0 * sin_half))
+                u_val = slopes_u[i] * z_start + intercepts_u[i]
+                v_val = slopes_v[j] * z_start + intercepts_v[j]
+                x_start = (u_val + v_val) / (2.0 * cos_phi)
+                y_start = (u_val - v_val) / (2.0 * sin_phi)
                 start_pos = np.array([x_start, y_start, z_start])
                 matched_tracks.append((start_pos, d))
         if matched_tracks:
@@ -171,38 +174,37 @@ def style_plot(ax, title, xlabel, ylabel):
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.tick_params(labelsize=10)
 
-# --- 1. X Correlation (Direct Regression) ---
+# --- 1. X Correlation ---
 fig, ax = plt.subplots()
 ax.scatter(df_test["true_x"], pred_x, color='green', alpha=0.6, edgecolors='k')
 ax.plot([df_test["true_x"].min(), df_test["true_x"].max()], 
         [df_test["true_x"].min(), df_test["true_x"].max()], 'r--', lw=2, label="Ideal (y=x)")
-style_plot(ax, "X Correlation: Predicted vs. Actual (GBDT)", "Actual X (mm)", "Predicted X (mm)")
+style_plot(ax, "X Correlation: Predicted vs. Actual (phi = 3 deg)", "Actual X (mm)", "Predicted X (mm)")
 ax.legend()
 plt.tight_layout()
 plt.savefig("x_correlation_regression.png")
 plt.close()
 
-# --- 2. Y Correlation (Direct Regression) ---
+# --- 2. Y Correlation ---
 fig, ax = plt.subplots()
 ax.scatter(df_test["true_y"], pred_y, color='green', alpha=0.6, edgecolors='k')
 ax.plot([df_test["true_y"].min(), df_test["true_y"].max()], 
         [df_test["true_y"].min(), df_test["true_y"].max()], 'r--', lw=2, label="Ideal (y=x)")
-style_plot(ax, "Y Correlation: Predicted vs. Actual (GBDT)", "Actual Y (mm)", "Predicted Y (mm)")
+style_plot(ax, "Y Correlation: Predicted vs. Actual (phi = 3 deg)", "Actual Y (mm)", "Predicted Y (mm)")
 ax.legend()
 plt.tight_layout()
 plt.savefig("y_correlation_regression.png")
 plt.close()
 
-# --- 3. Z Correlation (Direct Regression) ---
+# --- 3. Z Correlation ---
 fig, ax = plt.subplots()
 ax.scatter(df_test["true_z"], pred_z, color='green', alpha=0.6, edgecolors='k')
 ax.plot([df_test["true_z"].min(), df_test["true_z"].max()], 
         [df_test["true_z"].min(), df_test["true_z"].max()], 'r--', lw=2, label="Ideal (y=x)")
-style_plot(ax, "Z Correlation: Predicted vs. Actual (GBDT)", "Actual Z (mm)", "Predicted Z (mm)")
+style_plot(ax, "Z Correlation: Predicted vs. Actual (phi = 3 deg)", "Actual Z (mm)", "Predicted Z (mm)")
 ax.legend()
 plt.tight_layout()
 plt.savefig("z_correlation_regression.png")
 plt.close()
 
-print("Successfully saved predicted vs actual correlation plots for direct regression:")
-print(" - x_correlation_regression.png\n - y_correlation_regression.png\n - z_correlation_regression.png")
+print("Successfully saved predicted vs actual correlation plots for direct regression (phi = 3 deg)")

@@ -20,7 +20,7 @@ reg_x = joblib.load("event_regressor_x.joblib")
 reg_y = joblib.load("event_regressor_y.joblib")
 reg_z = joblib.load("event_regressor_z.joblib")
 
-# Load data
+# Load data and reconstruct features (using phi = 3 deg)
 file_path = Path("../Cut2.root")
 if not file_path.exists():
     file_path = Path("Cut2.root")
@@ -39,9 +39,10 @@ lc_arr = t_lc.arrays([
 ], entry_stop=n_events)
 tr_arr = t_tr.arrays(["NeutrinoX4"], entry_stop=n_events)
 
-theta = 3.0 * np.pi / 180.0
-cos_half = np.cos(theta / 2.0)
-sin_half = np.sin(theta / 2.0)
+# New stereo tilt angle: phi = 3 degrees
+phi = 3.0 * np.pi / 180.0
+cos_phi = np.cos(phi)
+sin_phi = np.sin(phi)
 
 def get_line_start_end(event_id, view, idx):
     if view == "U":
@@ -53,10 +54,10 @@ def get_line_start_end(event_id, view, idx):
     return min(z1, z2), max(z1, z2)
 
 def fit_3d_line_from_2d(s_u, int_u, s_v, int_v):
-    slope_x = (s_u + s_v) / (2.0 * cos_half)
-    int_x = (int_u + int_v) / (2.0 * cos_half)
-    slope_y = (s_u - s_v) / (2.0 * sin_half)
-    int_y = (int_u - int_v) / (2.0 * sin_half)
+    slope_x = (s_u + s_v) / (2.0 * cos_phi)
+    int_x = (int_u + int_v) / (2.0 * cos_phi)
+    slope_y = (s_u - s_v) / (2.0 * sin_phi)
+    int_y = (int_u - int_v) / (2.0 * sin_phi)
     p0 = np.array([int_x, int_y, 0.0])
     d = np.array([slope_x, slope_y, 1.0])
     d = d / np.linalg.norm(d)
@@ -116,8 +117,10 @@ for event_id in range(n_events):
                 v_used.add(j)
                 p0, d = fit_3d_line_from_2d(slopes_u[i], intercepts_u[i], slopes_v[j], intercepts_v[j])
                 z_start = (z_starts_u[i] + z_starts_v[j]) / 2.0
-                x_start = ((slopes_u[i] + slopes_v[j]) / (2.0 * cos_half)) * z_start + ((intercepts_u[i] + intercepts_v[j]) / (2.0 * cos_half))
-                y_start = ((slopes_u[i] - slopes_v[j]) / (2.0 * sin_half)) * z_start + ((intercepts_u[i] - intercepts_v[j]) / (2.0 * sin_half))
+                u_val = slopes_u[i] * z_start + intercepts_u[i]
+                v_val = slopes_v[j] * z_start + intercepts_v[j]
+                x_start = (u_val + v_val) / (2.0 * cos_phi)
+                y_start = (u_val - v_val) / (2.0 * sin_phi)
                 start_pos = np.array([x_start, y_start, z_start])
                 matched_tracks.append((start_pos, d))
         if matched_tracks:
@@ -184,35 +187,34 @@ def style_plot(ax, title, xlabel, ylabel):
     ax.grid(True, linestyle=':', alpha=0.6)
     ax.tick_params(labelsize=10)
 
-# --- 1. X Residual Distribution (Before vs After) ---
+# --- 1. X Residual Distribution ---
 fig, ax = plt.subplots()
 ax.hist(dx_before[core_mask], bins=25, color='red', alpha=0.5, edgecolor='black', label=f"Before: $\sigma$={np.std(dx_before[core_mask]):.1f} mm")
 ax.hist(dx_after[core_mask], bins=25, color='green', alpha=0.5, edgecolor='black', label=f"After: $\sigma$={np.std(dx_after[core_mask]):.1f} mm")
-style_plot(ax, "X Residual (dx) Distribution: Event-Level", "dx (mm)", "Counts")
+style_plot(ax, "X Residual (dx) Distribution (phi = 3 deg)", "dx (mm)", "Counts")
 ax.legend()
 plt.tight_layout()
 plt.savefig("x_residual_regression.png")
 plt.close()
 
-# --- 2. Y Residual Distribution (Before vs After) ---
+# --- 2. Y Residual Distribution ---
 fig, ax = plt.subplots()
 ax.hist(dy_before[core_mask], bins=25, color='red', alpha=0.5, edgecolor='black', label=f"Before: $\sigma$={np.std(dy_before[core_mask]):.1f} mm")
 ax.hist(dy_after[core_mask], bins=25, color='green', alpha=0.5, edgecolor='black', label=f"After: $\sigma$={np.std(dy_after[core_mask]):.1f} mm")
-style_plot(ax, "Y Residual (dy) Distribution: Event-Level", "dy (mm)", "Counts")
+style_plot(ax, "Y Residual (dy) Distribution (phi = 3 deg)", "dy (mm)", "Counts")
 ax.legend()
 plt.tight_layout()
 plt.savefig("y_residual_regression.png")
 plt.close()
 
-# --- 3. Z Residual Distribution (Before vs After) ---
+# --- 3. Z Residual Distribution ---
 fig, ax = plt.subplots()
 ax.hist(dz_before[core_mask], bins=25, color='red', alpha=0.5, edgecolor='black', label=f"Before: $\sigma$={np.std(dz_before[core_mask]):.1f} mm")
 ax.hist(dz_after[core_mask], bins=25, color='green', alpha=0.5, edgecolor='black', label=f"After: $\sigma$={np.std(dz_after[core_mask]):.1f} mm")
-style_plot(ax, "Z Residual (dz) Distribution: Event-Level", "dz (mm)", "Counts")
+style_plot(ax, "Z Residual (dz) Distribution (phi = 3 deg)", "dz (mm)", "Counts")
 ax.legend()
 plt.tight_layout()
 plt.savefig("z_residual_regression.png")
 plt.close()
 
-print("Successfully saved residual plots for direct regression:")
-print(" - x_residual_regression.png\n - y_residual_regression.png\n - z_residual_regression.png")
+print("Successfully saved residual plots for direct regression (phi = 3 deg)")

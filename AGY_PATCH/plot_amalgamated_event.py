@@ -42,15 +42,10 @@ n_lines_v = lc_arr["nLinesV"][0]
 track_hits_u = lc_arr["TrackHitPosU"][0]
 track_hits_v = lc_arr["TrackHitPosV"][0]
 
-print(f"Event {event_id}:")
-print(f" - Reco Tracks: {n_tracks}")
-print(f" - Hough U-lines: {n_lines_u}")
-print(f" - Hough V-lines: {n_lines_v}")
-
-# Stereo transformation constants
-theta = 3.0 * np.pi / 180.0
-cos_half = np.cos(theta / 2.0)
-sin_half = np.sin(theta / 2.0)
+# New stereo tilt angle: phi = 3 degrees
+phi = 3.0 * np.pi / 180.0
+cos_phi = np.cos(phi)
+sin_phi = np.sin(phi)
 
 # Colors for plotting
 colors = ['blue', 'green', 'orange', 'purple', 'brown', 'magenta', 'cyan']
@@ -64,10 +59,9 @@ for i in range(n_tracks):
     xs, ys, zs = start_pos[i][0], start_pos[i][1], start_pos[i][2]
     xe, ye, ze = end_pos[i][0], end_pos[i][1], end_pos[i][2]
     
-    # Plot track line
     c = colors[i % len(colors)]
     ax3d.plot([zs, ze], [xs, xe], [ys, ye], color=c, lw=3, label=f"Reco Track {i}")
-    ax3d.scatter([zs], [xs], [ys], color='red', s=40, zorder=5) # Mark start
+    ax3d.scatter([zs], [xs], [ys], color='red', s=40, zorder=5)
 
 ax3d.set_title("3D Reco Tracks (Reco_Tree)")
 ax3d.set_xlabel("Z (mm)")
@@ -79,7 +73,6 @@ ax3d.legend()
 # --- Panel 2: U-View (TrackHitsU and Reco Tracks projected to U) ---
 ax_u = fig.add_subplot(132)
 
-# Plot U hits
 for i in range(n_lines_u):
     hits = ak.to_numpy(track_hits_u[i])
     mask = (hits[:, 0] != 0.0) | (hits[:, 1] != 0.0)
@@ -88,18 +81,17 @@ for i in range(n_lines_u):
         c = colors[i % len(colors)]
         ax_u.scatter(act_hits[:, 0], act_hits[:, 1], color=c, marker='o', s=30, alpha=0.7, edgecolors='k', label=f"U-Hit Cluster {i}")
 
-# Plot projected 3D Reco tracks in U view
 for i in range(n_tracks):
     xs, ys, zs = start_pos[i][0], start_pos[i][1], start_pos[i][2]
     xe, ye, ze = end_pos[i][0], end_pos[i][1], end_pos[i][2]
     
-    # Project to U coordinate: u = x*cos + y*sin
-    us = xs * cos_half + ys * sin_half
-    ue = xe * cos_half + ye * sin_half
+    # Project to U using new phi = 3 degrees
+    us = xs * cos_phi + ys * sin_phi
+    ue = xe * cos_phi + ye * sin_phi
     
     ax_u.plot([zs, ze], [us, ue], color='black', linestyle='--', lw=2, label=f"Reco Track {i} Proj" if i == 0 else "")
 
-ax_u.set_title("U View: Hits & Projected Tracks")
+ax_u.set_title("U View: Hits & Projected Tracks (phi = 3 deg)")
 ax_u.set_xlabel("Z Position (mm)")
 ax_u.set_ylabel("U Position (mm)")
 ax_u.grid(True, linestyle=':', alpha=0.6)
@@ -108,7 +100,6 @@ ax_u.legend(loc='best')
 # --- Panel 3: V-View (TrackHitsV and Reco Tracks projected to V) ---
 ax_v = fig.add_subplot(133)
 
-# Plot V hits
 for j in range(n_lines_v):
     hits = ak.to_numpy(track_hits_v[j])
     mask = (hits[:, 0] != 0.0) | (hits[:, 1] != 0.0)
@@ -117,18 +108,17 @@ for j in range(n_lines_v):
         c = colors[j % len(colors)]
         ax_v.scatter(act_hits[:, 0], act_hits[:, 1], color=c, marker='o', s=30, alpha=0.7, edgecolors='k', label=f"V-Hit Cluster {j}")
 
-# Plot projected 3D Reco tracks in V view
 for j in range(n_tracks):
     xs, ys, zs = start_pos[j][0], start_pos[j][1], start_pos[j][2]
     xe, ye, ze = end_pos[j][0], end_pos[j][1], end_pos[j][2]
     
-    # Project to V coordinate: v = x*cos - y*sin
-    vs = xs * cos_half - ys * sin_half
-    ve = xe * cos_half - ye * sin_half
+    # Project to V using new phi = 3 degrees
+    vs = xs * cos_phi - ys * sin_phi
+    ve = xe * cos_phi - ye * sin_phi
     
     ax_v.plot([zs, ze], [vs, ve], color='black', linestyle='--', lw=2, label=f"Reco Track {j} Proj" if j == 0 else "")
 
-ax_v.set_title("V View: Hits & Projected Tracks")
+ax_v.set_title("V View: Hits & Projected Tracks (phi = 3 deg)")
 ax_v.set_xlabel("Z Position (mm)")
 ax_v.set_ylabel("V Position (mm)")
 ax_v.grid(True, linestyle=':', alpha=0.6)
@@ -139,4 +129,4 @@ plt.tight_layout()
 plt.savefig("amalgamated_event0.png")
 plt.close()
 
-print("Successfully saved amalgamated event display: amalgamated_event0.png")
+print("Successfully saved amalgamated event display: amalgamated_event0.png (phi = 3 deg)")

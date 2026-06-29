@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import joblib
 from pathlib import Path
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error
 from scipy.stats import norm
 
@@ -45,9 +45,10 @@ lc_fields = [
 lc_arr = t_lc.arrays(lc_fields, entry_stop=n_events)
 tr_arr = t_tr.arrays(["NeutrinoX4"], entry_stop=n_events)
 
-theta = 3.0 * np.pi / 180.0
-cos_half = np.cos(theta / 2.0)
-sin_half = np.sin(theta / 2.0)
+# New stereo tilt angle: phi = 3 degrees
+phi = 3.0 * np.pi / 180.0
+cos_phi = np.cos(phi)
+sin_phi = np.sin(phi)
 
 def get_line_start_end(event_id, view, idx):
     if view == "U":
@@ -59,10 +60,10 @@ def get_line_start_end(event_id, view, idx):
     return min(z1, z2), max(z1, z2)
 
 def fit_3d_line_from_2d(s_u, int_u, s_v, int_v):
-    slope_x = (s_u + s_v) / (2.0 * cos_half)
-    int_x = (int_u + int_v) / (2.0 * cos_half)
-    slope_y = (s_u - s_v) / (2.0 * sin_half)
-    int_y = (int_u - int_v) / (2.0 * sin_half)
+    slope_x = (s_u + s_v) / (2.0 * cos_phi)
+    int_x = (int_u + int_v) / (2.0 * cos_phi)
+    slope_y = (s_u - s_v) / (2.0 * sin_phi)
+    int_y = (int_u - int_v) / (2.0 * sin_phi)
     p0 = np.array([int_x, int_y, 0.0])
     d = np.array([slope_x, slope_y, 1.0])
     d = d / np.linalg.norm(d)
@@ -97,7 +98,6 @@ for event_id in range(n_events):
     if not (11124.0 <= true_z <= 18544.0):
         continue
         
-    # Extract line parameters
     slopes_u = lc_arr["SlopeU"][event_id].tolist()
     intercepts_u = lc_arr["InterceptU"][event_id].tolist()
     slopes_v = lc_arr["SlopeV"][event_id].tolist()
@@ -110,22 +110,12 @@ for event_id in range(n_events):
     nhits_u = lc_arr["nHitsInTrackU"][event_id].tolist()
     nhits_v = lc_arr["nHitsInTrackV"][event_id].tolist()
     
-    # Track Z ranges
-    z_starts_u = []
-    z_ends_u = []
-    for i in range(n_u):
-        zs, ze = get_line_start_end(event_id, "U", i)
-        z_starts_u.append(zs)
-        z_ends_u.append(ze)
+    z_starts_u = [get_line_start_end(event_id, "U", i)[0] for i in range(n_u)]
+    z_ends_u = [get_line_start_end(event_id, "U", i)[1] for i in range(n_u)]
+    z_starts_v = [get_line_start_end(event_id, "V", j)[0] for j in range(n_v)]
+    z_ends_v = [get_line_start_end(event_id, "V", j)[1] for j in range(n_v)]
         
-    z_starts_v = []
-    z_ends_v = []
-    for j in range(n_v):
-        zs, ze = get_line_start_end(event_id, "V", j)
-        z_starts_v.append(zs)
-        z_ends_v.append(ze)
-        
-    # Compute baseline geometric vertex (if possible)
+    # Compute baseline geometric vertex
     x_reco, y_reco, z_reco = 0.0, 0.0, 0.0
     matched_tracks = []
     if n_u > 0 and n_v > 0:
@@ -144,8 +134,10 @@ for event_id in range(n_events):
                 v_used.add(j)
                 p0, d = fit_3d_line_from_2d(slopes_u[i], intercepts_u[i], slopes_v[j], intercepts_v[j])
                 z_start = (z_starts_u[i] + z_starts_v[j]) / 2.0
-                x_start = ((slopes_u[i] + slopes_v[j]) / (2.0 * cos_half)) * z_start + ((intercepts_u[i] + intercepts_v[j]) / (2.0 * cos_half))
-                y_start = ((slopes_u[i] - slopes_v[j]) / (2.0 * sin_half)) * z_start + ((intercepts_u[i] - intercepts_v[j]) / (2.0 * sin_half))
+                u_val = slopes_u[i] * z_start + intercepts_u[i]
+                v_val = slopes_v[j] * z_start + intercepts_v[j]
+                x_start = (u_val + v_val) / (2.0 * cos_phi)
+                y_start = (u_val - v_val) / (2.0 * sin_phi)
                 start_pos = np.array([x_start, y_start, z_start])
                 matched_tracks.append((start_pos, d))
                 
@@ -153,12 +145,10 @@ for event_id in range(n_events):
             vtx = matched_tracks[0][0] if len(matched_tracks) == 1 else reconstruct_vertex_3d(matched_tracks)
             x_reco, y_reco, z_reco = vtx[0], vtx[1], vtx[2]
             
-    # If no baseline vertex could be reconstructed, use average start Z as Z-reco
     if z_reco == 0.0:
         all_starts = z_starts_u + z_starts_v
         z_reco = np.mean(all_starts) if all_starts else 11500.0
         
-    # Feature compilation (Handle empty lists with fallbacks)
     feat = {
         "x_reco": x_reco, "y_reco": y_reco, "z_reco": z_reco,
         "nLinesU": n_u, "nLinesV": n_v,
@@ -186,9 +176,7 @@ for event_id in range(n_events):
     event_level_dataset.append(feat)
 
 df_event = pd.DataFrame(event_level_dataset)
-print(f"Compiled event-level dataset for {len(df_event)} events.")
 
-# Define feature columns
 feature_cols = [col for col in df_event.columns if not col.startswith("true_")]
 X = df_event[feature_cols]
 
@@ -196,10 +184,8 @@ y_x = df_event["true_x"]
 y_y = df_event["true_y"]
 y_z = df_event["true_z"]
 
-# Split
 X_train, X_test, indices_train, indices_test = train_test_split(X, df_event.index, test_size=0.2, random_state=42)
 
-# Train three separate Gradient Boosting Regressors (with conservative hyperparameters to avoid overfitting)
 reg_x = GradientBoostingRegressor(n_estimators=60, max_depth=3, learning_rate=0.08, random_state=42)
 reg_y = GradientBoostingRegressor(n_estimators=60, max_depth=3, learning_rate=0.08, random_state=42)
 reg_z = GradientBoostingRegressor(n_estimators=60, max_depth=3, learning_rate=0.08, random_state=42)
@@ -208,22 +194,18 @@ reg_x.fit(X_train, y_x.loc[indices_train])
 reg_y.fit(X_train, y_y.loc[indices_train])
 reg_z.fit(X_train, y_z.loc[indices_train])
 
-# Save models
 joblib.dump(reg_x, "event_regressor_x.joblib")
 joblib.dump(reg_y, "event_regressor_y.joblib")
 joblib.dump(reg_z, "event_regressor_z.joblib")
-print("Saved event-level regressors to event_regressor_[x/y/z].joblib")
+print("Saved event-level GBDT regressors (phi = 3 deg) to event_regressor_[x/y/z].joblib")
 
-# Evaluate on test set
 df_test = df_event.loc[indices_test].copy()
 X_test_feats = X.loc[indices_test]
 
-# Predict true vertex directly
 pred_x = reg_x.predict(X_test_feats)
 pred_y = reg_y.predict(X_test_feats)
 pred_z = reg_z.predict(X_test_feats)
 
-# Calculate residuals before correction (using x_reco) vs. after direct regression
 dx_before = df_test["x_reco"] - df_test["true_x"]
 dy_before = df_test["y_reco"] - df_test["true_y"]
 dz_before = df_test["z_reco"] - df_test["true_z"]
@@ -234,19 +216,10 @@ dy_after = pred_y - df_test["true_y"]
 dz_after = pred_z - df_test["true_z"]
 dr_after = np.sqrt(dx_after**2 + dy_after**2 + dz_after**2)
 
-# Outlier filtering (worst 5% by dr_before) to check core improvement
 thresh_before = np.percentile(dr_before, 95.0)
 core_mask = dr_before <= thresh_before
 
-print(f"\nEvaluation of Event-Level Direct Regression (Test N = {len(df_test)}):")
-print("\n=== RESIDUALS BEFORE DIRECT REGRESSION (GEOMETRIC RECO) ===")
-print(pd.DataFrame({
-    "dx_before": dx_before[core_mask],
-    "dy_before": dy_before[core_mask],
-    "dz_before": dz_before[core_mask],
-    "dr_before": dr_before[core_mask]
-}).describe())
-
+print("\nEvaluation of Event-Level Direct Regression (phi = 3 deg):")
 print("\n=== RESIDUALS AFTER DIRECT EVENT-LEVEL REGRESSION ===")
 print(pd.DataFrame({
     "dx_after": dx_after[core_mask],
@@ -255,34 +228,16 @@ print(pd.DataFrame({
     "dr_after": dr_after[core_mask]
 }).describe())
 
-# Save comparison stats to text file
-with open("event_level_regression_performance.txt", "w") as f_out:
-    f_out.write("=== EVENT-LEVEL DIRECT REGRESSION PERFORMANCE (TEST CORE 95%) ===\n")
-    f_out.write("\n--- BEFORE REGRESSION (GEOMETRIC) ---\n")
-    f_out.write(pd.DataFrame({
-        "dx_before": dx_before[core_mask], "dy_before": dy_before[core_mask],
-        "dz_before": dz_before[core_mask], "dr_before": dr_before[core_mask]
-    }).describe().to_string())
-    f_out.write("\n\n--- AFTER DIRECT REGRESSION ---\n")
-    f_out.write(pd.DataFrame({
-        "dx_after": dx_after[core_mask], "dy_after": dy_after[core_mask],
-        "dz_after": dz_after[core_mask], "dr_after": dr_after[core_mask]
-    }).describe().to_string())
-print("Saved stats to event_level_regression_performance.txt")
-
-# Plot distributions before vs. after event-level direct regression
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 
-# Plot Y coordinate residuals comparison (where the biggest improvement is expected)
 axes[0].hist(dy_before[core_mask], bins=20, color='red', alpha=0.5, edgecolor='black', label=f"Before: $\sigma$={np.std(dy_before[core_mask]):.1f} mm")
 axes[0].hist(dy_after[core_mask], bins=20, color='green', alpha=0.5, edgecolor='black', label=f"After: $\sigma$={np.std(dy_after[core_mask]):.1f} mm")
-axes[0].set_title("Y Residual Distribution")
+axes[0].set_title("Y Residual Distribution (phi = 3 deg)")
 axes[0].set_xlabel("dy (mm)")
 axes[0].set_ylabel("Counts")
 axes[0].legend()
 axes[0].grid(True, linestyle=':', alpha=0.6)
 
-# Plot 3D Distance error (dr) comparison
 axes[1].hist(dr_before[core_mask], bins=20, color='red', alpha=0.5, edgecolor='black', label=f"Before: median={np.median(dr_before[core_mask]):.1f} mm")
 axes[1].hist(dr_after[core_mask], bins=20, color='green', alpha=0.5, edgecolor='black', label=f"After: median={np.median(dr_after[core_mask]):.1f} mm")
 axes[1].set_title("3D Distance Error (dr) Distribution")
@@ -291,7 +246,7 @@ axes[1].set_ylabel("Counts")
 axes[1].legend()
 axes[1].grid(True, linestyle=':', alpha=0.6)
 
-plt.suptitle("Event-Level Direct ML Regression Performance (Using All Info from U & V)", fontsize=15, y=1.02)
+plt.suptitle("Event-Level Direct ML Regression Performance (phi = 3 deg)", fontsize=15, y=1.02)
 plt.tight_layout()
 plt.savefig("reco_vs_true_event_level_regression.png")
 print("Saved reco_vs_true_event_level_regression.png")
