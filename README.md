@@ -2,6 +2,8 @@
 
 This repository contains the Machine Learning reconstruction suite developed for **The Muon Spectrometer (TMS)** primary interaction vertex reconstruction and particle identification (PID). 
 
+🚀 **Launch the Interactive 3D Presentation**: Open [index.html](file:///C:/MY_CODES/NIRAB_DAI/index.html) in your browser to view the interactive presentation, detailing our physical constraints, methodology slides, and final reconstruction results with animated 3D particle tracks!
+
 All optimized models, source codes, plots, and thesis-level documentation are located in the [AGY_PATCH](./AGY_PATCH) directory.
 
 ---

@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TMS Reconstruction Suite - Interactive Presentation</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #0b0c10;
+            --card-bg: rgba(22, 24, 37, 0.7);
+            --primary: #4f46e5;
+            --primary-glow: rgba(79, 70, 229, 0.4);
+            --secondary: #06b6d4;
+            --accent: #f59e0b;
+            --success: #10b981;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        /* 3D Track Background Canvas */
+        #canvas3d {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        /* Gradient Overlays */
+        .gradient-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(79, 70, 229, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 40%);
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Layout */
+        header {
+            position: relative;
+            z-index: 10;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            background: rgba(11, 12, 16, 0.8);
+            backdrop-filter: blur(8px);
+        }
+
+        header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #fff 0%, var(--secondary) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        header .logo-dot {
+            width: 10px;
+            height: 10px;
+            background-color: var(--secondary);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--secondary);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.4); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 600;
+        }
+
+        main {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        /* Glassmorphism Slide Container */
+        .slide-container {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            width: 100%;
+            height: 72vh;
+            padding: 3rem;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .slide-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--secondary) 100%);
+        }
+
+        /* Slide Content Area */
+        .slide-content {
+            flex: 1;
+            display: flex;
+            gap: 3rem;
+            align-items: center;
+            opacity: 1;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .slide-text {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide-visual {
+            flex: 0.8;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .slide-title {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+            color: #fff;
+        }
+
+        .slide-title span {
+            color: var(--secondary);
+        }
+
+        .slide-desc {
+            font-size: 1.1rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        /* Tables & Lists inside Slides */
+        .slide-data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .slide-data-table th, .slide-data-table td {
+            padding: 0.75rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .slide-data-table th {
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+
+        .slide-data-table td {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+        }
+
+        .highlight-val {
+            color: var(--success);
+            font-weight: 600;
+        }
+
+        .highlight-err {
+            color: #ef4444;
+        }
+
+        .physics-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .physics-list li {
+            position: relative;
+            padding-left: 1.5rem;
+            font-size: 1rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        .physics-list li::before {
+            content: '✦';
+            position: absolute;
+            left: 0;
+            color: var(--secondary);
+        }
+
+        /* Visual Element Placeholders */
+        .visual-circle {
+            position: absolute;
+            border-radius: 50%;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            animation: rotate 20s linear infinite;
+        }
+
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .visual-inner {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 5;
+            padding: 2rem;
+        }
+
+        .visual-formula {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem;
+            color: #fff;
+            background: rgba(255, 255, 255, 0.04);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin: 1rem 0;
+        }
+
+        /* Slide Navigation Footer */
+        footer {
+            position: relative;
+            z-index: 10;
+            padding: 1.5rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(11, 12, 16, 0.8);
+            border-top: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-btn:hover:not(:disabled) {
+            background: var(--primary);
+            border-color: var(--primary);
+            box-shadow: 0 0 15px var(--primary-glow);
+        }
+
+        .nav-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .progress-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .progress-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .progress-dot.active {
+            background: var(--secondary);
+            transform: scale(1.5);
+            box-shadow: 0 0 8px var(--secondary);
+        }
+
+        .slide-counter-text {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="gradient-bg"></div>
+    <canvas id="canvas3d"></canvas>
+
+    <header>
+        <div>
+            <h1 onclick="goToSlide(0)" style="cursor: pointer;"><span class="logo-dot"></span> TMS Reconstruction Suite</h1>
+            <p class="subtitle" style="font-size: 0.7rem; margin-top: 2px;">Interactive Landing & Presentation Deck</p>
+        </div>
+        <div style="text-align: right;">
+            <p class="subtitle" id="topic-subtitle">Slide Topic</p>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">Use Left/Right arrows or buttons to navigate</p>
+        </div>
+    </header>
+
+    <main>
+        <div class="slide-container" id="deck">
+            <div class="slide-content" id="slide-inner">
+                <!-- Content injected dynamically by JS -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="slide-counter-text" id="counter-display">
+            Slide 1 of 10
+        </div>
+        <div class="progress-indicator" id="dots-container">
+            <!-- Dots injected by JS -->
+        </div>
+        <div class="controls">
+            <button class="nav-btn" id="prev-btn" onclick="prevSlide()" disabled>
+                ← Previous
+            </button>
+            <button class="nav-btn" id="next-btn" onclick="nextSlide()">
+                Next →
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        // Slide database
+        const slides = [
+            {
+                topic: "Introduction",
+                title: "Machine Learning in the <span>TMS Detector</span>",
+                desc: "Welcome to the TMS Machine Learning Reconstruction Suite. This interactive landing deck explores our primary vertex reconstruction algorithms, particle identification classifiers, and the physics-motivated solutions developed for the Muon Spectrometer.",
+                bullet1: "Overview: Optimizing simulated event reconstruction from Cut2.root (1,380 events).",
+                bullet2: "Vertex Refinement: Corrects geometric offsets and shrinks error resolutions.",
+                bullet3: "Particle ID: Deeply penetrates particle classification (muons vs. pions/protons/electrons).",
+                visual: `
+                    <div class="visual-inner">
+                        <div class="visual-circle" style="width: 250px; height: 250px;"></div>
+                        <div class="visual-circle" style="width: 180px; height: 180px; animation-duration: 10s; animation-direction: reverse;"></div>
+                        <h2 style="font-family:'Space Grotesk'; font-size: 2.2rem; margin-top: 1rem; color: #fff;">TMS</h2>
+                        <p style="font-size: 0.9rem; color: var(--secondary); letter-spacing: 2px; font-weight:600; text-transform:uppercase;">ML Suite v2.0</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Detector Geometry",
+                title: "The Muon Spectrometer <span>(TMS)</span>",
+                desc: "The TMS features alternating planes of steel absorber and scintillator strips, oriented in tilted U and V views. Reconstructing coordinate vertices from these views requires high-precision geometric modeling.",
+                bullet1: "X-Axis: Represents the transverse horizontal coordinate.",
+                bullet2: "Y-Axis: Represents the vertical coordinate.",
+                bullet3: "Z-Axis: Longitudinally tracks propagation depth through the steel plates.",
+                visual: `
+                    <div class="visual-inner" style="align-items: flex-start; text-align: left;">
+                        <h3 style="font-family:'Space Grotesk'; margin-bottom: 0.75rem; color:#fff;">Coordinate Ranges:</h3>
+                        <p style="margin-bottom: 0.5rem; font-size: 0.95rem;"><strong style="color:var(--secondary)">X:</strong> [-1800, +1800] mm (Width)</p>
+                        <p style="margin-bottom: 0.5rem; font-size: 0.95rem;"><strong style="color:var(--secondary)">Y:</strong> [-1800, +1800] mm (Height)</p>
+                        <p style="margin-bottom: 0.5rem; font-size: 0.95rem;"><strong style="color:var(--secondary)">Z:</strong> [11124, 18544] mm (Active Spectrometer)</p>
+                        <div style="width: 100%; height: 2px; background: var(--border); margin: 1rem 0;"></div>
+                        <p style="font-size: 0.85rem; color:var(--text-muted);">Muons propagate through these coordinates, losing energy continuously.</p>
+                    </div>
+                `
+            },
+            {
+                topic: "The Stereo Problem",
+                title: "The <span>Stereo Tilt Angle</span> Limitation",
+                desc: "The scintillator strips in U and V views are tilted by only ±3° relative to vertical. This geometry amplifies coordinate errors when solving for vertical coordinate Y.",
+                bullet1: "Stereo Equations: u = x cos(3°) + y sin(3°) | v = x cos(3°) - y sin(3°)",
+                bullet2: "Vertical Solution: y = (u - v) / (2 sin(3°))",
+                bullet3: "Error Amplification: Since 2 sin(3°) ≈ 0.1047, any measurement error in u or v is amplified 9.5-fold when calculating Y.",
+                visual: `
+                    <div class="visual-inner">
+                        <p style="font-size: 0.9rem; color: var(--accent); font-weight:600; text-transform:uppercase; letter-spacing:1px;">Vertical Angle Equation</p>
+                        <div class="visual-formula">y = &Delta;<sub>uv</sub> / 2 sin(3&deg;)</div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">2 sin(3&deg;) &approx; 0.1047 | Amplifies error &approx; 9.5x</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Hadronic Shower Z-Shift",
+                title: "The Hadronic Shower <span>Z-Shift</span>",
+                desc: "Primary neutrino interactions produce a dense hadronic shower core. Reco tracks only begin downstream of this core when the muon escapes the shower, creating a systematic shift in Z.",
+                bullet1: "Physical Effect: Track starts (StartPos) are systematically shifted downstream.",
+                bullet2: "Vertex Displacement: Reconstructed vertices often sit 100-300 mm downstream of the true interaction vertex.",
+                bullet3: "ML Refinement: Standard regression algorithms must learn to subtract this systematic Z displacement based on energy profiles.",
+                visual: `
+                    <div class="visual-inner" style="align-items: flex-start; text-align: left;">
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; margin-bottom: 0.5rem;">Z Residual Shift:</h4>
+                        <div style="display:flex; align-items:center; gap: 1rem; margin-bottom: 1rem;">
+                            <span style="font-size:1.8rem; color:#ef4444;">&Delta;z<sub>avg</sub></span>
+                            <span style="font-size:1.2rem; color: var(--text-muted);">&approx; +225 mm</span>
+                        </div>
+                        <p style="font-size: 0.9rem; color:var(--text-muted); line-height:1.4;">Gradient Boosting Regressors learn this shift and pull predicted vertices upstream (towards the true origin).</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Approach A: 2D Lines",
+                title: "Vertex Approach A: <span>2D Hough Lines</span>",
+                desc: "Our first reconstruction pipeline pairs raw 2D Hough segments from Line_Candidates, projecting them into 3D using the stereo geometry math.",
+                bullet1: "Feature Matrix: 23 features extracted per event (line counts, slopes, intercepts).",
+                bullet2: "Inputs: Reconstructed 2D U segments (+3°) and V segments (-3°).",
+                bullet3: "Model: GBDT regression to correct the vertical scaling mismatches.",
+                visual: `
+                    <div class="visual-inner" style="align-items: flex-start; text-align: left;">
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; margin-bottom: 0.5rem;">2D Hough Features:</h4>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• SlopeU & InterceptU</p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• SlopeV & InterceptV</p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• TrackLengthU & TrackLengthV</p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.25rem;">• TotalTrackEnergyU & TotalTrackEnergyV</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Approach B: 3D Tracks",
+                title: "Vertex Approach B: <span>3D Reco Tracks</span>",
+                desc: "Our second reconstruction pipeline utilizes fully fitted 3D tracks from Reco_Tree, bypassing the 2D pairing step entirely.",
+                bullet1: "PCA Solver: Computes 3D intersection using StartPos and StartDirection.",
+                bullet2: "Advantage: 3D tracks incorporate global plane multi-hit clustering and Kalman filter fits.",
+                bullet3: "Precision: Reduces Y-coordinate baseline error standard deviation by 87.7% (from 6.5 m to 80 cm).",
+                visual: `
+                    <div class="visual-inner">
+                        <div style="text-align: center; margin-bottom: 1rem;">
+                            <p style="font-size: 0.9rem; color: var(--success); font-weight:600; text-transform:uppercase;">Baseline Y-Resolution Shift</p>
+                            <h3 style="font-size: 2.2rem; color: #fff;">-87.7%</h3>
+                            <p style="font-size:0.85rem; color:var(--text-muted);">6.5m (2D lines) &rarr; 80cm (3D Tracks)</p>
+                        </div>
+                    </div>
+                `
+            },
+            {
+                topic: "Sandbox Ensemble",
+                title: "The Sandbox <span>Ensemble Model</span>",
+                desc: "We evaluated an enriched feature set and voting ensemble to push reconstruction accuracy to the absolute physical limit.",
+                bullet1: "Hadronic Energy: Extracted sum of first 5 hits from TrackHitEnergies.",
+                bullet2: "Scattering Proxy: Analyzed 3D length vs straight-line distance.",
+                bullet3: "Model: Ensembled GBDT, Random Forest, and a fully converged MLP Neural Network.",
+                visual: `
+                    <div class="visual-inner" style="align-items: flex-start; text-align: left;">
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; margin-bottom: 0.5rem;">Ensemble Architecture:</h4>
+                        <p style="font-size:0.9rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">GBDT:</strong> Gradient Boosting (wt = 2.0)</p>
+                        <p style="font-size:0.9rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">RF:</strong> Random Forest (wt = 1.0)</p>
+                        <p style="font-size:0.9rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">MLP:</strong> Multi-Layer Perceptron (wt = 1.0)</p>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:0.5rem;">Optimized with early stopping & max_iter=1200.</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Vertex Results",
+                title: "Vertex Reconstruction <span>Performance</span>",
+                desc: "Machine Learning GBDTs and Ensembles successfully corrected the physical Z-shifts and Y stereo distortions on the test set:",
+                table: true,
+                visual: `
+                    <div class="visual-inner">
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; margin-bottom: 0.5rem;">3D Error (dr) Core 95%:</h4>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Baseline 2D Lines: <span class="highlight-err">2307.5 mm</span></p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">ML predicted 2D Lines: <span style="color:#fff;">892.2 mm</span></p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Baseline 3D Tracks: <span class="highlight-err">1197.0 mm</span></p>
+                        <p style="font-size: 0.9rem; margin-bottom: 0.5rem;">Ensembled 3D Tracks: <span class="highlight-val">646.4 mm</span></p>
+                    </div>
+                `
+            },
+            {
+                topic: "Particle ID",
+                title: "Particle ID <span>(PID) Classifier</span>",
+                desc: "We trained a Balanced Random Forest Classifier on 16 track-level features to classify tracks into their Particle Data Group (PDG) ID groups.",
+                bullet1: "Imbalance Correction: Handled minority hadron and electron classes via balanced weighting.",
+                bullet2: "Muon Identification (PDG 13): Achieved 88% precision and 79% recall.",
+                bullet3: "Proton Recapture (PDG 2212): Recovered 45% recall by tuning class weights.",
+                visual: `
+                    <div class="visual-inner" style="align-items: flex-start; text-align: left;">
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; margin-bottom: 0.5rem;">Primary Features:</h4>
+                        <p style="font-size: 0.95rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">Momentum:</strong> Track energy curvature.</p>
+                        <p style="font-size: 0.95rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">Length_3D:</strong> Track physical range.</p>
+                        <p style="font-size: 0.95rem; margin-bottom: 0.25rem;"><strong style="color:var(--secondary)">dE/dx:</strong> Energy deposit per mm.</p>
+                    </div>
+                `
+            },
+            {
+                topic: "Way Forward",
+                title: "Future <span>Way Forward</span>",
+                desc: "The results demonstrate that machine learning models can successfully correct for physical detector constraints. Future pipelines can expand on these topologies.",
+                bullet1: "Graph Neural Networks (GNN): Train directly on 3D hit arrays rather than track summaries.",
+                bullet2: "End-to-End Joint Inference: Predict vertex coordinates and track PDGs simultaneously.",
+                bullet3: "Software Integration: Deploy pipelines directly into TMS simulation software.",
+                visual: `
+                    <div class="visual-inner">
+                        <div class="visual-circle" style="width: 200px; height: 200px; border-color: var(--secondary);"></div>
+                        <h4 style="color:#fff; font-family:'Space Grotesk'; z-index: 10;">GNNs & End-to-End</h4>
+                        <p style="font-size: 0.8rem; color:var(--text-muted); z-index: 10; margin-top: 5px;">The future of TMS Reconstruction</p>
+                    </div>
+                `
+            }
+        ];
+
+        let currentSlide = 0;
+
+        function renderSlide() {
+            const slide = slides[currentSlide];
+            document.getElementById("topic-subtitle").innerText = slide.topic;
+            document.getElementById("counter-display").innerText = `Slide ${currentSlide + 1} of ${slides.length}`;
+            
+            const container = document.getElementById("slide-inner");
+            container.style.opacity = 0;
+            
+            setTimeout(() => {
+                let html = "";
+                if (slide.table) {
+                    html = `
+                        <div class="slide-text">
+                            <h2 class="slide-title">${slide.title}</h2>
+                            <p class="slide-desc">${slide.desc}</p>
+                            <table class="slide-data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Model Style</th>
+                                        <th>Median 3D Error (dr)</th>
+                                        <th>Y Std Dev (dy)</th>
+                                        <th>Z Std Dev (dz)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td>Baseline 2D Lines</td>
+                                        <td class="highlight-err">2307.5 mm</td>
+                                        <td>3788.9 mm</td>
+                                        <td>3201.1 mm</td>
+                                    </tr>
+                                    <tr>
+                                        <td>ML Predicted 2D Lines</td>
+                                        <td>892.2 mm</td>
+                                        <td>667.3 mm</td>
+                                        <td>906.3 mm</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Baseline 3D Tracks</td>
+                                        <td class="highlight-err">1197.0 mm</td>
+                                        <td>809.8 mm</td>
+                                        <td>2362.9 mm</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color:#fff; font-weight:600;">Optimized Ensemble</td>
+                                        <td class="highlight-val">646.4 mm</td>
+                                        <td class="highlight-val">570.1 mm</td>
+                                        <td class="highlight-val">657.5 mm</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="slide-visual">
+                            ${slide.visual}
+                        </div>
+                    `;
+                } else {
+                    html = `
+                        <div class="slide-text">
+                            <h2 class="slide-title">${slide.title}</h2>
+                            <p class="slide-desc">${slide.desc}</p>
+                            <ul class="physics-list">
+                                <li>${slide.bullet1}</li>
+                                <li>${slide.bullet2}</li>
+                                <li>${slide.bullet3}</li>
+                            </ul>
+                        </div>
+                        <div class="slide-visual">
+                            ${slide.visual}
+                        </div>
+                    `;
+                }
+                container.innerHTML = html;
+                container.style.opacity = 1;
+                
+                // Update buttons
+                document.getElementById("prev-btn").disabled = currentSlide === 0;
+                document.getElementById("next-btn").disabled = currentSlide === slides.length - 1;
+                
+                // Update dots
+                const dots = document.querySelectorAll(".progress-dot");
+                dots.forEach((dot, idx) => {
+                    if (idx === currentSlide) {
+                        dot.classList.add("active");
+                    } else {
+                        dot.classList.remove("active");
+                    }
+                });
+            }, 300);
+        }
+
+        function nextSlide() {
+            if (currentSlide < slides.length - 1) {
+                currentSlide++;
+                renderSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                renderSlide();
+            }
+        }
+
+        function goToSlide(idx) {
+            currentSlide = idx;
+            renderSlide();
+        }
+
+        // Initialize dots
+        const dotsContainer = document.getElementById("dots-container");
+        for (let i = 0; i < slides.length; i++) {
+            const dot = document.createElement("div");
+            dot.className = `progress-dot ${i === 0 ? 'active' : ''}`;
+            dot.onclick = () => goToSlide(i);
+            dotsContainer.appendChild(dot);
+        }
+
+        // Keyboard Controls
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "ArrowRight" || e.key === " ") {
+                nextSlide();
+            } else if (e.key === "ArrowLeft") {
+                prevSlide();
+            }
+        });
+
+        renderSlide();
+
+        // 3D Canvas Background Particle Tracks Simulator
+        const canvas = document.getElementById("canvas3d");
+        const ctx = canvas.getContext("2d");
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener("resize", () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        // Simulating tracks originating from a vertex
+        class Track {
+            constructor() {
+                this.reset();
+            }
+            
+            reset() {
+                this.x = 0;
+                this.y = 0;
+                this.z = -200;
+                
+                // Direction angles
+                const theta = Math.random() * Math.PI * 2;
+                const phi = (Math.random() - 0.5) * 0.5; // propagate mostly forward in Z
+                
+                this.vx = Math.cos(theta) * Math.sin(phi) * 4;
+                this.vy = Math.sin(theta) * Math.sin(phi) * 4;
+                this.vz = Math.cos(phi) * 4;
+                
+                this.history = [];
+                this.maxHistory = 100 + Math.random() * 80;
+                this.charge = Math.random() > 0.5 ? 1 : -1;
+                this.color = Math.random() > 0.6 ? "rgba(6, 182, 212, 0.4)" : "rgba(79, 70, 229, 0.4)";
+                if (Math.random() > 0.95) this.color = "rgba(245, 158, 11, 0.6)"; // golden track (muon)
+            }
+            
+            update() {
+                this.history.push({ x: this.x, y: this.y, z: this.z });
+                if (this.history.length > this.maxHistory) {
+                    this.history.shift();
+                }
+                
+                // Simulate magnetic bending in X-Z plane
+                const magneticField = 0.01;
+                this.vx += this.vz * magneticField * this.charge;
+                this.vz -= this.vx * magneticField * this.charge;
+                
+                this.x += this.vx;
+                this.y += this.vy;
+                this.z += this.vz;
+                
+                if (this.z > 300 || this.x > 400 || this.x < -400 || this.y > 400 || this.y < -400) {
+                    this.reset();
+                }
+            }
+            
+            draw() {
+                if (this.history.length < 2) return;
+                ctx.beginPath();
+                
+                const project = (pt) => {
+                    // Simple 3D perspective projection
+                    const scale = 400 / (pt.z + 500);
+                    return {
+                        x: width / 2 + pt.x * scale,
+                        y: height / 2 + pt.y * scale
+                    };
+                };
+                
+                const start = project(this.history[0]);
+                ctx.moveTo(start.x, start.y);
+                
+                for (let i = 1; i < this.history.length; i++) {
+                    const next = project(this.history[i]);
+                    ctx.lineTo(next.x, next.y);
+                }
+                
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+
+        const tracks = Array.from({ length: 15 }, () => new Track());
+
+        function animate() {
+            ctx.fillStyle = "rgba(11, 12, 16, 0.1)";
+            ctx.fillRect(0, 0, width, height);
+            
+            tracks.forEach(track => {
+                track.update();
+                track.draw();
+            });
+            
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
